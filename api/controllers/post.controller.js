@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js";
 import {ObjectId} from "mongodb";
+import jwt from "jsonwebtoken";
 
 export const getPosts= async(req,res)=>{
   const query= req.query;
@@ -31,9 +32,7 @@ export const getPosts= async(req,res)=>{
 export const getPost= async(req,res)=>{
   const id=req.params.id
 
-  // if (!isValidObjectId(postId)){
-  //   return res.status(400).json({message:"Invalid post ID"});
-  // }
+
   try{
     const post= await prisma.post.findUnique({
       where:{id},
@@ -48,13 +47,36 @@ export const getPost= async(req,res)=>{
         
       }
     })
+    // if (!post){
+    //   return res.status(404).json({message:"post not found"});
+    // }
 
-    if (!post){
-      return res.status(404).json({message:"post not found"});
+    let userId;
+
+    const token = req.cookies?.token;
+
+    if(!token){
+      userId =null;
+    }else{
+      jwt.verify(token,process.env.JWT_SECRET_KEY, async (err,payload)=>{
+        if(err){
+          userId =null;
+        }else{
+          userId =payload.id;
+        }
+      })
     }
-   
+    const saved = await prisma.savedPost.findUnique({
+      where:{
+        userId_postId:{
+          postId: id,
+          userId,
+        }
+      }
+    })
+
     
-    res.status(200).json(post)
+    res.status(200).json({...post, isSaved:saved ? true :false})
   
   }catch(err){
     console.log(err)
